@@ -143,9 +143,11 @@ architecture rtl of top is
 
   signal char_we             : std_logic;
   signal char_address        : std_logic_vector(MEM_ADDR_WIDTH-1 downto 0);
+  signal next_char_address   : std_logic_vector(MEM_ADDR_WIDTH-1 downto 0);
   signal char_value          : std_logic_vector(5 downto 0);
 
   signal pixel_address       : std_logic_vector(GRAPH_MEM_ADDR_WIDTH-1 downto 0);
+  signal next_pixel_address       : std_logic_vector(GRAPH_MEM_ADDR_WIDTH-1 downto 0);
   signal pixel_value         : std_logic_vector(GRAPH_MEM_DATA_WIDTH-1 downto 0);
   signal pixel_we            : std_logic;
 
@@ -158,6 +160,19 @@ architecture rtl of top is
   signal dir_blue            : std_logic_vector(7 downto 0);
   signal dir_pixel_column    : std_logic_vector(10 downto 0);
   signal dir_pixel_row       : std_logic_vector(10 downto 0);
+  
+  component reg is
+		generic(
+			WIDTH    : positive := 1;
+			RST_INIT : integer := 0
+		);
+		port(
+			i_clk  : in  std_logic;
+			in_rst : in  std_logic;
+			i_d    : in  std_logic_vector(WIDTH-1 downto 0);
+			o_q    : out std_logic_vector(WIDTH-1 downto 0)
+		);
+	end component reg;
 
 begin
 
@@ -170,8 +185,8 @@ begin
   graphics_lenght <= conv_std_logic_vector(MEM_SIZE*8*8, GRAPH_MEM_ADDR_WIDTH);
   
   -- removed to inputs pin
-  direct_mode <= '1';
-  display_mode     <= "10";  -- 01 - text mode, 10 - graphics mode, 11 - text & graphics
+  direct_mode <= direct_mode_i;
+  display_mode     <= display_mode_i;  -- 01 - text mode, 10 - graphics mode, 11 - text & graphics
   
   font_size        <= x"1";
   show_frame       <= '1';
@@ -248,36 +263,68 @@ begin
     blue_o             => blue_o     
   );
   
+  cnt_reg: reg
+	generic map(
+		WIDTH => MEM_ADDR_WIDTH,
+		RST_INIT => 0
+	)
+	port map(
+		i_clk => pix_clock_s,
+		in_rst => vga_rst_n_s,
+		i_d => next_char_address,
+		o_q => char_address
+	);
+	
+	cnt_reg2: reg
+	generic map(
+		WIDTH => GRAPH_MEM_ADDR_WIDTH,
+		RST_INIT => 0
+	)
+	port map(
+		i_clk => pix_clock_s,
+		in_rst => vga_rst_n_s,
+		i_d => next_pixel_address,
+		o_q => pixel_address
+	);
+	
+	
+	next_char_address <= 
+		(others => '0') when 1199 = char_address else char_address + 1;
+		
+	next_pixel_address <= 
+		(others => '0') when 1199 = pixel_address else pixel_address + 1;
+	
+  
   -- na osnovu signala iz vga_top modula dir_pixel_column i dir_pixel_row realizovati logiku koja genereise
   --dir_red
   --dir_green
   --dir_blue
 	dir_red <= x"FF" when dir_pixel_column < 79 else
-				x"FF" when dir_pixel_column > 79 and dir_pixel_column < 159 else
-				x"00" when dir_pixel_column > 159 and dir_pixel_column < 239 else
-				x"00" when dir_pixel_column > 239 and dir_pixel_column < 319 else
-				x"FF" when dir_pixel_column > 319 and dir_pixel_column < 399 else
-				x"FF" when dir_pixel_column > 399 and dir_pixel_column < 479 else
-				x"00" when dir_pixel_column > 479 and dir_pixel_column < 559 else
-				x"00" when dir_pixel_column > 559 and dir_pixel_column < 639 ;
+				x"FF" when dir_pixel_column > 79 and dir_pixel_column < 160 else
+				x"00" when dir_pixel_column > 159 and dir_pixel_column < 240 else
+				x"00" when dir_pixel_column > 239 and dir_pixel_column < 320 else
+				x"FF" when dir_pixel_column > 319 and dir_pixel_column < 400 else
+				x"FF" when dir_pixel_column > 399 and dir_pixel_column < 480 else
+				x"00" when dir_pixel_column > 479 and dir_pixel_column < 560 else
+				x"00" when dir_pixel_column > 559 and dir_pixel_column < 640 ;
 	
 	dir_green <= x"FF" when dir_pixel_column < 79 else
-				x"FF" when dir_pixel_column > 79 and dir_pixel_column < 159 else
-				x"FF" when dir_pixel_column > 159 and dir_pixel_column < 239 else
-				x"FF" when dir_pixel_column > 239 and dir_pixel_column < 319 else
-				x"00" when dir_pixel_column > 319 and dir_pixel_column < 399 else
-				x"00" when dir_pixel_column > 399 and dir_pixel_column < 479 else
-				x"00" when dir_pixel_column > 479 and dir_pixel_column < 559 else
-				x"00" when dir_pixel_column > 559 and dir_pixel_column < 639 ;
+				x"FF" when dir_pixel_column > 79 and dir_pixel_column < 160 else
+				x"FF" when dir_pixel_column > 159 and dir_pixel_column < 240 else
+				x"FF" when dir_pixel_column > 239 and dir_pixel_column < 320 else
+				x"00" when dir_pixel_column > 319 and dir_pixel_column < 400 else
+				x"00" when dir_pixel_column > 399 and dir_pixel_column < 480 else
+				x"00" when dir_pixel_column > 479 and dir_pixel_column < 560 else
+				x"00" when dir_pixel_column > 559 and dir_pixel_column < 640 ;
 	
 	dir_blue <= x"FF" when dir_pixel_column < 79 else
-				x"00" when dir_pixel_column > 79 and dir_pixel_column < 159 else
-				x"FF" when dir_pixel_column > 159 and dir_pixel_column < 239 else
-				x"00" when dir_pixel_column > 239 and dir_pixel_column < 319 else
-				x"FF" when dir_pixel_column > 319 and dir_pixel_column < 399 else
-				x"00" when dir_pixel_column > 399 and dir_pixel_column < 479 else
-				x"FF" when dir_pixel_column > 479 and dir_pixel_column < 559 else
-				x"00" when dir_pixel_column > 559 and dir_pixel_column < 639 ;
+				x"00" when dir_pixel_column > 79 and dir_pixel_column < 160 else
+				x"FF" when dir_pixel_column > 159 and dir_pixel_column < 240 else
+				x"00" when dir_pixel_column > 239 and dir_pixel_column < 320 else
+				x"FF" when dir_pixel_column > 319 and dir_pixel_column < 400 else
+				x"00" when dir_pixel_column > 399 and dir_pixel_column < 480 else
+				x"FF" when dir_pixel_column > 479 and dir_pixel_column < 560 else
+				x"00" when dir_pixel_column > 559 and dir_pixel_column < 640 ;
 				
  
  
@@ -286,10 +333,51 @@ begin
   --char_value
   --char_we
   
+  char_we <= '1';
+  char_value <= o"01" when char_address = 0 else
+					o"02" when char_address = 1 else
+					o"03" when char_address = 2 else
+					o"40";
+  
   -- koristeci signale realizovati logiku koja pise po GRAPH_MEM
   --pixel_address
   --pixel_value
   --pixel_we
+  
+  pixel_we <= '1';
+  pixel_value <= x"FFFFFFFF" when pixel_address = 0 else
+					x"FFFFFFFF" when pixel_address = 20 else
+					x"FFFFFFFF" when pixel_address = 40 else
+					x"FFFFFFFF" when pixel_address = 60 else
+					x"FFFFFFFF" when pixel_address = 80 else
+					x"FFFFFFFF" when pixel_address = 100 else
+					x"FFFFFFFF" when pixel_address = 120 else
+					x"FFFFFFFF" when pixel_address = 140 else
+					x"FFFFFFFF" when pixel_address = 180 else
+					x"FFFFFFFF" when pixel_address = 200 else
+					x"FFFFFFFF" when pixel_address = 220 else
+					x"FFFFFFFF" when pixel_address = 240 else
+					x"FFFFFFFF" when pixel_address = 260 else
+					x"FFFFFFFF" when pixel_address = 280 else
+					x"FFFFFFFF" when pixel_address = 300 else
+					x"FFFFFFFF" when pixel_address = 320 else
+					x"FFFFFFFF" when pixel_address = 340 else
+					x"FFFFFFFF" when pixel_address = 360 else
+					x"FFFFFFFF" when pixel_address = 380 else
+					x"FFFFFFFF" when pixel_address = 400 else
+					x"FFFFFFFF" when pixel_address = 480 else
+					x"FFFFFFFF" when pixel_address = 500 else
+					x"FFFFFFFF" when pixel_address = 520 else
+					x"FFFFFFFF" when pixel_address = 540 else
+					x"FFFFFFFF" when pixel_address = 580 else
+					x"FFFFFFFF" when pixel_address = 600 else
+					x"FFFFFFFF" when pixel_address = 620 else
+					x"FFFFFFFF" when pixel_address = 640 else
+					x"FFFFFFFF" when pixel_address = 660 else
+					x"FFFFFFFF" when pixel_address = 680 else
+					x"FFFFFFFF" when pixel_address = 700 else
+					x"FFFFFFFF" when pixel_address = 720 else
+					x"00000000";
   
   
 end rtl;
